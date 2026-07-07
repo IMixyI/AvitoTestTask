@@ -5,6 +5,8 @@ from sqlalchemy.exc import IntegrityError, NoResultFound, SQLAlchemyError
 from src.db_client import DBClient
 from src.dto import (
     CreatePullRequestRequest,
+    DeactivateUsersRequest,
+    DeactivateUsersResponse,
     ErrorCode,
     MergePullRequestRequest,
     PullRequestResponse,
@@ -15,6 +17,7 @@ from src.dto import (
     TeamResponse,
     UserResponse,
     UserReviewsResponse,
+    UsersPullRequestsResponse,
 )
 
 
@@ -84,8 +87,17 @@ class ReviewService:
                 message="unexpected error",
             )
 
-    async def get_user_reviews(self, user_id: str) -> UserReviewsResponse:
-        pass
+    async def get_user_reviews(self, user_id: str) -> UserReviewsResponse | None:
+        try:
+            pull_requests = await self.db_client.get_user_reviews(user_id)
+            return UserReviewsResponse(user_id=user_id, pull_requests=pull_requests)
+        except SQLAlchemyError as e:
+            logger.error(e)
+            self.raise_api_error(
+                status_code=500,
+                code=ErrorCode.INTERNAL_ERROR,
+                message="unexpected error",
+            )
 
     async def create_pull_request(
         self, request: CreatePullRequestRequest
@@ -117,10 +129,69 @@ class ReviewService:
 
     async def merge_pull_request(
         self, request: MergePullRequestRequest
-    ) -> PullRequestResponse:
-        pass
+    ) -> PullRequestResponse | None:
+        try:
+            pull_request = await self.db_client.merge_pull_request(
+                request.pull_request_id
+            )
+            return PullRequestResponse(pr=pull_request)
+        except NoResultFound:
+            self.raise_api_error(
+                status_code=404,
+                code=ErrorCode.NOT_FOUND,
+                message="pr or team not found",
+            )
+        except SQLAlchemyError as e:
+            logger.error(e)
+            self.raise_api_error(
+                status_code=500,
+                code=ErrorCode.INTERNAL_ERROR,
+                message="unexpected error",
+            )
 
     async def reassign_pull_request(
         self, request: ReassignPullRequestRequest
-    ) -> ReassignPullRequestResponse:
-        pass
+    ) -> ReassignPullRequestResponse | None:
+        try:
+            pull_request, new_reviewers_id = await self.db_client.reassign_pull_request(
+                request.pull_request_id, request.old_user_id
+            )
+            return ReassignPullRequestResponse(
+                pr=pull_request, replaced_by=new_reviewers_id
+            )
+        except SQLAlchemyError as e:
+            logger.error(e)
+            self.raise_api_error(
+                status_code=500,
+                code=ErrorCode.INTERNAL_ERROR,
+                message="unexpected error",
+            )
+
+    async def deactivate_users(
+        self, request: DeactivateUsersRequest
+    ) -> DeactivateUsersResponse | None:
+        try:
+            await self.db_client.deactivate_users(**request.model_dump())
+            team_members = await self.db_client.get_team(request.team_name)
+            return DeactivateUsersResponse(
+                team=Team(team_name=request.team_name, members=team_members)
+            )
+        except SQLAlchemyError as e:
+            logger.error(e)
+            self.raise_api_error(
+                status_code=500,
+                code=ErrorCode.INTERNAL_ERROR,
+                message="unexpected error",
+            )
+
+    async def get_users_prs(self) -> UsersPullRequestsResponse | None:
+        try:
+            result = await self.db_client.get_users_prs()
+            return UsersPullRequestsResponse(users_prs=result)
+        except SQLAlchemyError as e:
+            logger.error(e)
+            self.raise_api_error(
+                status_code=500,
+                code=ErrorCode.INTERNAL_ERROR,
+                message="unexpected error",
+            )

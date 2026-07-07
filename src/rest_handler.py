@@ -4,6 +4,8 @@ from fastapi import Depends, Query, Request
 
 from src.dto import (
     CreatePullRequestRequest,
+    DeactivateUsersRequest,
+    DeactivateUsersResponse,
     MergePullRequestRequest,
     PullRequestResponse,
     ReassignPullRequestRequest,
@@ -13,6 +15,7 @@ from src.dto import (
     TeamResponse,
     UserResponse,
     UserReviewsResponse,
+    UsersPullRequestsResponse,
 )
 from src.lifespan import create_app
 from src.review_service import ReviewService
@@ -32,13 +35,13 @@ async def health_check():
     return {"status": "ok"}
 
 
-@app.post("/team/add", response_model=TeamResponse, status_code=201, tags=["Teams"])
+@app.post("/teams", response_model=TeamResponse, status_code=201, tags=["Teams"])
 async def create_team(team: Team, review_service: ReviewServiceDEP) -> TeamResponse:
     """Создать команду с участниками (создаёт/обновляет пользователей)"""
     return await review_service.create_team(team)
 
 
-@app.get("/team/get", response_model=Team, tags=["Teams"])
+@app.get("/teams", response_model=Team, tags=["Teams"])
 async def get_team(
     review_service: ReviewServiceDEP,
     team_name: str = Query(..., description="Уникальное имя команды"),
@@ -47,7 +50,7 @@ async def get_team(
     return await review_service.get_team(team_name)
 
 
-@app.post("/users/setIsActive", response_model=UserResponse, tags=["Users"])
+@app.patch("/users/active", response_model=UserResponse, tags=["Users"])
 async def set_is_active(
     request: SetIsActiveRequest, review_service: ReviewServiceDEP
 ) -> UserResponse:
@@ -55,7 +58,7 @@ async def set_is_active(
     return await review_service.set_is_active(request)
 
 
-@app.get("/users/getReview", response_model=UserReviewsResponse, tags=["Users"])
+@app.get("/users/reviews", response_model=UserReviewsResponse, tags=["Users"])
 async def get_user_reviews(
     review_service: ReviewServiceDEP,
     user_id: str = Query(..., description="Идентификатор пользователя"),
@@ -65,7 +68,7 @@ async def get_user_reviews(
 
 
 @app.post(
-    "/pullRequest/create",
+    "/pull-request",
     response_model=PullRequestResponse,
     status_code=201,
     tags=["PullRequests"],
@@ -77,8 +80,8 @@ async def create_pull_request(
     return await review_service.create_pull_request(request)
 
 
-@app.post(
-    "/pullRequest/merge", response_model=PullRequestResponse, tags=["PullRequests"]
+@app.patch(
+    "/pull-request/merge", response_model=PullRequestResponse, tags=["PullRequests"]
 )
 async def merge_pull_request(
     request: MergePullRequestRequest, review_service: ReviewServiceDEP
@@ -87,8 +90,8 @@ async def merge_pull_request(
     return await review_service.merge_pull_request(request)
 
 
-@app.post(
-    "/pullRequest/reassign",
+@app.patch(
+    "/pull-request/reassign",
     response_model=ReassignPullRequestResponse,
     tags=["PullRequests"],
 )
@@ -97,3 +100,23 @@ async def reassign_pull_request(
 ) -> ReassignPullRequestResponse:
     """Переназначить конкретного ревьювера на другого из его команды"""
     return await review_service.reassign_pull_request(request)
+
+
+@app.patch(
+    "/teams/users",
+    response_model=DeactivateUsersResponse,
+    tags=["Teams"],
+)
+async def deactivate_users(
+    request: DeactivateUsersRequest, review_service: ReviewServiceDEP
+) -> DeactivateUsersResponse:
+    """Массовая деактиванция пользователей команды"""
+    return await review_service.deactivate_users(request)
+
+
+@app.get(
+    "/users/pull-requests", response_model=UsersPullRequestsResponse, tags=["Users"]
+)
+async def get_users_prs(review_service: ReviewServiceDEP) -> UsersPullRequestsResponse:
+    """Получить количесто PR, созданных пользователями"""
+    return await review_service.get_users_prs()

@@ -59,12 +59,16 @@ class PullRequest(BaseModel):
     createdAt: datetime | None
     mergedAt: datetime | None
 
+    model_config = ConfigDict(from_attributes=True)
+
 
 class PullRequestShort(BaseModel):
     pull_request_id: str
     pull_request_name: str
     author_id: str
     status: PullRequestStatus
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SetIsActiveRequest(BaseModel):
@@ -107,3 +111,21 @@ class ReassignPullRequestResponse(BaseModel):
 class UserReviewsResponse(BaseModel):
     user_id: str
     pull_requests: list[PullRequestShort]
+
+
+class DeactivateUsersRequest(BaseModel):
+    user_ids: list[str]
+    team_name: str
+
+
+class DeactivateUsersResponse(BaseModel):
+    team: Team
+
+
+class UsersPRMapping(BaseModel):
+    user_id: str
+    pull_requests_count: int
+
+
+class UsersPullRequestsResponse(BaseModel):
+    users_prs: list[UsersPRMapping]

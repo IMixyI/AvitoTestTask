@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 
 class BackendConfig(BaseSettings):
     HOST: str = "0.0.0.0"
-    PORT: int = 8067
+    PORT: int = 8080
     RELOAD: bool = True
 
 
