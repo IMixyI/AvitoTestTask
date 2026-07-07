@@ -94,12 +94,19 @@ class DBClient:
                     code=ErrorCode.NO_CANDIDATE,
                     message="no active replacement candidate in team",
                 )
-            query = insert(ReviewerForPRModel).values(
-                [
-                    {"pull_request_id": pr_id, "user_id": available_reviewer_id}
-                    for available_reviewer_id in available_reviewer_ids
-                ]
-            )
+            if available_reviewer_ids:
+                query = (
+                    insert(ReviewerForPRModel)
+                    .values(
+                        [
+                            {"pull_request_id": pr_id, "user_id": available_reviewer_id}
+                            for available_reviewer_id in available_reviewer_ids
+                        ]
+                    )
+                    .on_conflict_do_nothing(
+                        index_elements=["pull_request_id", "user_id"]
+                    )
+                )
             await session.execute(query)
 
     async def create_team(self, team_name: str, members: list[TeamMember]) -> None:
@@ -417,6 +424,13 @@ class DBClient:
 
                 pr_reviewers_id.remove(old_user_id)
                 pr_reviewers_id.append(available_reviewer_id)
+            except IntegrityError:
+                await session.rollback()
+                self.raise_api_error(
+                    status_code=409,
+                    code=ErrorCode.NO_CANDIDATE,
+                    message="no active candidate in team",
+                )
             except HTTPException as e:
                 await session.rollback()
                 raise e
